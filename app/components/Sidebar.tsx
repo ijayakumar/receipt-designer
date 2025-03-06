@@ -21,6 +21,7 @@ import {
   Printer,
 } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { fetchWrapper } from "@/lib/fetch-wrapper"
 
 interface MenuItem {
   name: string
@@ -83,39 +84,31 @@ export function Sidebar({ className, isCollapsed }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem("token")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
+      await fetchWrapper(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       })
 
-      if (response.ok) {
-        // Clear local storage
-        localStorage.removeItem("token")
-        localStorage.removeItem("user")
-        localStorage.removeItem("permissions")
+      // Clear local storage
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
+      localStorage.removeItem("permissions")
 
-        // Show success toast
-        toast({
-          title: "Success",
-          description: "You have been logged out successfully.",
-          variant: "success",
-        })
+      // Show success toast
+      toast({
+        title: "Success",
+        description: "You have been logged out successfully.",
+        variant: "success",
+      })
 
-        // Redirect to login page
-        router.push("/login")
-      } else {
-        throw new Error("Logout failed")
-      }
+      // Redirect to login page
+      router.push("/login")
     } catch (error) {
       console.error("Logout error:", error)
-      toast({
-        title: "Error",
-        description: "An error occurred during logout. Please try again.",
-        variant: "destructive",
-      })
+      // Even if the API call fails, we should still clear local storage and redirect
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
+      localStorage.removeItem("permissions")
+      router.push("/login")
     }
   }
 

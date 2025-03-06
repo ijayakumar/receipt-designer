@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
 import ReceiptPreview from "./ReceiptPreview"
+import { fetchWrapper } from "@/lib/fetch-wrapper"
 
 export type ReceiptElement = {
   id: string
@@ -45,9 +46,19 @@ export default function ReceiptDesigner() {
     placeholderType: "text",
     metadata: {},
   })
-  const [dimensions, setDimensions] = useState({ width: 100, height: 300 }) // Updated default values
+  const [dimensions, setDimensions] = useState({ width: 30, height: 50 })
   const [formatName, setFormatName] = useState("")
   const [showResetConfirmation, setShowResetConfirmation] = useState(false)
+
+  const handleDimensionChange = (dimension: "width" | "height", value: number) => {
+    let newValue = value
+    if (dimension === "width") {
+      newValue = Math.max(20, Math.min(100, value))
+    } else if (dimension === "height") {
+      newValue = Math.max(20, Math.min(3000, value))
+    }
+    setDimensions((prev) => ({ ...prev, [dimension]: newValue }))
+  }
 
   const addElement = () => {
     if (currentElement.type === "text" && currentElement.content) {
@@ -82,11 +93,33 @@ export default function ReceiptDesigner() {
     setElements(elements.filter((element) => element.id !== id))
   }
 
+  // Modify the handleSave function to add validation
   const handleSave = async () => {
-    if (!formatName || formatName.length < 5) {
+    // Validate format name
+    if (!formatName || formatName.trim().length < 5) {
       toast({
-        title: "Error",
-        description: "Receipt format name must be at least 5 characters long.",
+        title: "Validation Error",
+        description: "Receipt format name must be at least 5 characters long",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate width
+    if (dimensions.width < 20 || dimensions.width > 100) {
+      toast({
+        title: "Validation Error",
+        description: "Width must be between 20mm and 100mm",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate height
+    if (dimensions.height < 20 || dimensions.height > 3000) {
+      toast({
+        title: "Validation Error",
+        description: "Height must be between 20mm and 3000mm",
         variant: "destructive",
       })
       return
@@ -136,32 +169,26 @@ export default function ReceiptDesigner() {
     }
 
     try {
-      const token = localStorage.getItem("token")
-      const response = await fetch(
+      const data = await fetchWrapper(
           `${process.env.NEXT_PUBLIC_API_URL}/api/main/receipt-management/design-your-receipt`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(receiptData),
           },
       )
 
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Receipt format is successfully saved",
-          variant: "success",
-        })
-        // Reset the form
-        setElements([])
-        setFormatName("")
-        setDimensions({ width: 100, height: 300 })
-      } else {
-        throw new Error("Failed to save receipt")
-      }
+      toast({
+        title: "Success",
+        description: "Receipt format is successfully saved",
+        variant: "success",
+      })
+      // Reset the form
+      setElements([])
+      setFormatName("")
+      setDimensions({ width: 30, height: 50 })
     } catch (error) {
       console.error("Error saving receipt:", error)
       toast({
@@ -179,22 +206,9 @@ export default function ReceiptDesigner() {
   const confirmReset = () => {
     setElements([])
     setFormatName("")
-    setDimensions({ width: 100, height: 300 })
+    setDimensions({ width: 30, height: 50 })
     setShowResetConfirmation(false)
   }
-
-  const handleDimensionChange = (dimension: "width" | "height", value: number) => {
-    let newValue = value
-    if (dimension === "width") {
-      newValue = Math.max(20, Math.min(100, value))
-    } else {
-      newValue = Math.max(20, Math.min(3000, value))
-    }
-    setDimensions((prev) => ({ ...prev, [dimension]: newValue }))
-  }
-
-  // Add this constant at the top of your component
-  const SCALE_FACTOR = 2 / 3 // This will make the preview content 2/3 of its original size (i.e., reduced by 1/3)
 
   return (
       <React.Fragment>
@@ -486,31 +500,9 @@ export default function ReceiptDesigner() {
           <div className="w-full md:w-1/2">
             <h2 className="text-xl font-semibold mb-4">Receipt Preview</h2>
             <p className="mb-2">
-              Dimensions: {dimensions.width}mm x {dimensions.height}mm
+              Dimensions: {dimensions.width * 10}px x {dimensions.height * 10}px
             </p>
-            <div
-                className="border p-4 rounded-lg bg-white relative overflow-hidden"
-                style={{
-                  width: `${dimensions.width + 16}mm`,
-                  height: `${dimensions.height + 16}mm`,
-                  maxWidth: "100%",
-                  maxHeight: "80vh",
-                }}
-            >
-              <div
-                  style={{
-                    transform: `scale(${SCALE_FACTOR})`,
-                    transformOrigin: "top left",
-                    width: `${dimensions.width}mm`,
-                    height: `${dimensions.height}mm`,
-                    position: "absolute",
-                    top: "8px",
-                    left: "8px",
-                  }}
-              >
-                <ReceiptPreview elements={elements} dimensions={dimensions} removeElement={removeElement} />
-              </div>
-            </div>
+            <ReceiptPreview elements={elements} dimensions={dimensions} removeElement={removeElement} />
           </div>
         </div>
         {showResetConfirmation && (
